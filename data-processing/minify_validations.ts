@@ -7,6 +7,12 @@ const fileName = "etaloni-01.01.xlsx";
 const inputDir = path.join(__dirname, "data", );
 const outputDir = path.join(__dirname, "processed-data");
 
+const tTypeDict: Record<string, string> = {
+	"A": "bus",
+	"Tm": "tram",
+	"Tr": "trol"
+};
+
 function excelDateToUnix(excelDate: number) {
 	return Math.floor((excelDate - 25569) * 86400); // 25569 is the days since 01.01.1900
 }
@@ -46,8 +52,14 @@ interface AggregateValidation {
 
 	while (data[`A${row}`]) {
 		const tID = data[`D${row}`].v as number;
-		const route = data[`F${row}`].v as string;
-		const routeDir = data[`G${row}`].v === "Forth" ? 1 : 0;
+		
+		const routeRaw = data[`F${row}`].v as string;
+		const routeSplit = routeRaw.split(" ");
+		const tTypeRaw = routeSplit[0];
+		const routeNr = routeSplit[1];
+		const route = `riga_${tTypeDict[tTypeRaw]}_${routeNr}`;
+
+		const routeDir = data[`G${row}`].v === "Forth" ? 0 : 1; // Forth - 0, Back - 1
 		const minTimestamp = getUnixMinute(excelDateToUnix(data[`I${row}`].v));
 
 		if (tID in aggregateValidations) {
@@ -86,7 +98,6 @@ interface AggregateValidation {
 
 	process.stdout.write("Writing output... ");
 	const outputData = Object.values(aggregateValidations).map((e) => Object.values(e)).flat();
-	console.log(outputData[0]);
 
 	csvstringify(outputData, async (err, output) => {
 		if (err) throw err;
