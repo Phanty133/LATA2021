@@ -19,6 +19,7 @@ interface ParsedTrip {
 	route_id: string,
 	direction: number,
 	block_id: number,
+	service_id: string,
 	min: number,
 	max: number,
 }
@@ -98,6 +99,7 @@ interface Stop{
 				route_id: tripRecord[0],
 				direction: tripRecord[4],
 				block_id: tripRecord[5],
+				service_id: tripRecord[1],
 				min,
 				max,
 			});
