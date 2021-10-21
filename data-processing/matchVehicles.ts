@@ -4,10 +4,12 @@ import path from "path";
 import csvstringify from "csv-stringify";
 
 const eticketDataPath = path.join(__dirname, "processed-data", "etaloni-01.01.csv");
-const tripDataPath = path.join(__dirname, "processed-data", "trip_intervals.csv");
+const tripDataPath = path.join(__dirname, "processed-data", "trips_filtered-01.01.csv");
 const outputPath = path.join(__dirname, "processed-data", "block-vehicle_dict_01.01.csv");
 
-const maxOutliers = 0;
+const maxOutliers = 2;
+const maxLowerTimeDeviation = 5;
+const maxUpperTimeDeviation = 5;
 
 interface TicketEntry {
 	count: number,
@@ -34,16 +36,59 @@ interface Block {
 	rID: string,
 }
 
+function removeFromArray<T>(array: T[], value: T, predicate = (a: T, b:T) => a === b){
+	return array.splice(array.findIndex((v) => predicate(v, value)), 1).length > 0;
+}
+
 function ticketMatchesBlock(ticket: TicketEntry, block: Block) {
 	const filteredTrips = block.trips.filter((t) => t.direction === ticket.direction);
 
 	for (const trip of filteredTrips) {
-		if (ticket.timestamp >= trip.minTime - 5 && ticket.timestamp <= trip.maxTime + 5) {
+		if (ticket.timestamp >= trip.minTime - maxLowerTimeDeviation && ticket.timestamp <= trip.maxTime + maxUpperTimeDeviation) {
 			return true;
 		}
 	}
 
 	return false;
+}
+
+let vehicleBlockDictMult: Record<string, string[]>;
+let vehicleBlockLocations: Record<string, string[]>;
+
+function checkVehicleDuplicates(tIDs: string[]) {
+	for (const tID of tIDs) {
+		let splice = false;
+
+		if (vehicleBlockLocations[tID].length === 1) {
+			const targetBlock = vehicleBlockLocations[tID][0];
+
+			for (const otherId of vehicleBlockDictMult[targetBlock]) {
+				removeFromArray(vehicleBlockLocations[otherId], targetBlock);
+			}
+
+			vehicleBlockDictMult[targetBlock] = [ tID ];
+		}
+
+		for (const blockID of vehicleBlockLocations[tID]) {
+			if (vehicleBlockDictMult[blockID].length === 1) {
+				splice = true;
+				break;
+			}
+		}
+
+		if (splice) {
+			for (const blockID of [...vehicleBlockLocations[tID]]) {
+				if (vehicleBlockDictMult[blockID].length !== 1) {
+					removeFromArray(vehicleBlockDictMult[blockID], tID);
+					removeFromArray(vehicleBlockLocations[tID], blockID);
+
+					if (vehicleBlockDictMult[blockID].length === 1) {
+						checkVehicleDuplicates(vehicleBlockDictMult[blockID]);
+					}
+				}
+			}
+		}
+	}
 }
 
 (async () => {
@@ -80,6 +125,8 @@ function ticketMatchesBlock(ticket: TicketEntry, block: Block) {
 		}
 	}
 
+	console.log(`Vehicles: ${Object.keys(transportData).length}`);
+
 	// Parse trip data
 
 	const blockData: Record<string, Block> = {};
@@ -104,8 +151,11 @@ function ticketMatchesBlock(ticket: TicketEntry, block: Block) {
 		}
 	}
 
+	console.log(`Blocks: ${Object.keys(blockData).length}`);
+
 	// Process data
-	const vehicleBlockDict: Record<string, string[]> = {}; // blockID : tID[]
+	vehicleBlockDictMult = {}; // blockID : tID[]
+	vehicleBlockLocations = {}; // tID: blockID[]
 	let inclusionByOutlier = 0;
 	let emptyBlock = 0;
 	let emptyTransportFilters = 0;
@@ -130,26 +180,33 @@ function ticketMatchesBlock(ticket: TicketEntry, block: Block) {
 				if (outliers > 0) {
 					inclusionByOutlier++;
 				}
+				
 				block.candidates.push(transport.tID);
-			}
-		}
 
-		if (block.candidates.length === 1) {
-			// delete transportData[block.candidates[0]];
+				if (transport.tID in vehicleBlockLocations) {
+					vehicleBlockLocations[transport.tID].push(block.blockID);
+				} else {
+					vehicleBlockLocations[transport.tID] = [block.blockID];
+				}
+			}
 		}
 
 		if (block.candidates.length === 0) {
 			emptyBlock++;
 		}
 
-		vehicleBlockDict[block.blockID] = block.candidates;
+		vehicleBlockDictMult[block.blockID] = block.candidates;
 	}
 
+	console.log(`Matched vehicles: ${Object.keys(vehicleBlockLocations).length}`);
+	console.log(`Matched blocks: ${Object.keys(vehicleBlockDictMult).length - emptyBlock}`);
 	console.log(`Inclusion by outlier: ${inclusionByOutlier}`);
-	console.log(`Empty block: ${emptyBlock}`);
-	console.log(`Empty filtered transports: ${emptyTransportFilters}`);
+	console.log(`Empty blocks: ${emptyBlock}`);
+	console.log(`Blocks without possible transports: ${emptyTransportFilters}`);
 
-	const outputData = Object.keys(vehicleBlockDict).map((id) => [id, ...vehicleBlockDict[id]]);
+	checkVehicleDuplicates(Object.keys(vehicleBlockLocations));
+
+	const outputData = Object.keys(vehicleBlockDictMult).map((id) => [id, ...vehicleBlockDictMult[id]]);
 
 	csvstringify(outputData, async (err, output) => {
 		if (err) throw err;
@@ -159,4 +216,3 @@ function ticketMatchesBlock(ticket: TicketEntry, block: Block) {
 		process.stdout.write("Done\n");
 	});
 })();
-

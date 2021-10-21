@@ -1,10 +1,10 @@
-import xlsx from "xlsx";
+import csvparse from "csv-parse";
 import path from "path";
 import fse from "fs-extra";
 import csvstringify from "csv-stringify";
 
-const fileName = "etaloni-01.01.xlsx";
-const inputDir = path.join(__dirname, "data", );
+const fileName = "etaloni-05.01.csv";
+const inputDir = path.join(__dirname, "data");
 const outputDir = path.join(__dirname, "processed-data");
 
 const tTypeDict: Record<string, string> = {
@@ -12,14 +12,6 @@ const tTypeDict: Record<string, string> = {
 	"Tm": "tram",
 	"Tr": "trol"
 };
-
-function excelDateToUnix(excelDate: number) {
-	return Math.floor((excelDate - 25569) * 86400); // 25569 is the days since 01.01.1900
-}
-
-function getUnixMinute(timestamp: number) {
-	return Math.floor(timestamp / 60);
-}
 
 interface AggregateValidation {
 	timestamp: number,
@@ -29,38 +21,34 @@ interface AggregateValidation {
 	count: number,
 }
 
-(() => {
-	process.stdout.write("Reading XLSX... ");
-	const fileData = xlsx.readFile(path.join(inputDir, fileName));
-	process.stdout.write("Done\n");
-
-	process.stdout.write("Parsing data... ");
-	const data = fileData.Sheets[fileData.SheetNames[0]];
-	let row = 2;
-
-	while(data[`A${row}`]) {
-		row++
-	};
-
-	const totalRows = row - 1;
-
+(async () => {
+	process.stdout.write("Reading file... ");
+	const parser = csvparse({ delimiter: ",", fromLine: 2 });
+	const fileStream = fse.createReadStream(path.join(inputDir, fileName));
+	fileStream.pipe(parser);
 	process.stdout.write("Done\n");
 
 	process.stdout.write("Processing data... ");
-	row = 2;
 	const aggregateValidations: Record<number, Record<number, AggregateValidation>> = {}; // TransportID : { Timestamp : Validations }
 
-	while (data[`A${row}`]) {
-		const tID = data[`D${row}`].v as number;
+	let row = 0;
+
+	for await (const record of parser) {
+		const tID = Number(record[3]);
+		const routeDir = record[6] === "Forth" ? 0 : 1; // Forth - 0, Back - 1
 		
-		const routeRaw = data[`F${row}`].v as string;
+		const routeRaw = record[5] as string;
 		const routeSplit = routeRaw.split(" ");
 		const tTypeRaw = routeSplit[0];
 		const routeNr = routeSplit[1];
 		const route = `riga_${tTypeDict[tTypeRaw]}_${routeNr}`;
 
-		const routeDir = data[`G${row}`].v === "Forth" ? 0 : 1; // Forth - 0, Back - 1
-		const minTimestamp = getUnixMinute(excelDateToUnix(data[`I${row}`].v));
+		const timeRaw: string = record[8];
+		const timeSplit = timeRaw.split(" "); // 0 - date, 1 - time
+		const dateReversed = timeSplit[0].split(".").reverse().join("-");
+		const dateString = `${dateReversed}T${timeSplit[1]}`;
+		const unixTimestamp = Math.floor(Date.parse(dateString) / 1000);
+		const minTimestamp = Math.floor(unixTimestamp / 60);
 
 		if (tID in aggregateValidations) {
 			if (minTimestamp in aggregateValidations[tID]) {
@@ -87,7 +75,7 @@ interface AggregateValidation {
 
 		process.stdout.clearLine(0);
 		process.stdout.cursorTo(0);
-		process.stdout.write(`Processing data... ${row} / ${totalRows}`);
+		process.stdout.write(`Processing data... ${row}`);
 
 		row++;
 	}
@@ -102,8 +90,7 @@ interface AggregateValidation {
 	csvstringify(outputData, async (err, output) => {
 		if (err) throw err;
 
-		const outFileName = `${path.basename(fileName, ".xlsx")}.csv`;
-		await fse.writeFile(path.join(outputDir, outFileName), output, "utf-8");
+		await fse.writeFile(path.join(outputDir, fileName), output, "utf-8");
 		
 		process.stdout.write("Done\n");
 	});

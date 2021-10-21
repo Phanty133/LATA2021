@@ -5,7 +5,8 @@
    4. Remove unnecessary columns (Ier_ID, Parks, Transp Veids, MarsrNos, ValidTalonaId, Laiks)
    5. Save the processed data into a new file
 2. Define a search interval for each trip (Minimum possible time for an e-ticket validation; Maximum possible time for an e-ticket validation)
-3. For each block_id (trips.csv):
+3. For every day, filter the relevant trips according to calendar and calendar_days
+4. For each block_id (trips.csv):
    1. For each transport ID in a filtered set, where tType and tRoute match block's tType and tRoute  (eticket.csv):
       1. For each e-ticket validation of the transport ID:
          1. If the e-ticket validation timestamp isn't in any trip time intervals, continue to next transport

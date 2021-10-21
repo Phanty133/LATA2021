@@ -99,9 +99,9 @@ interface Stop{
 				route_id: tripRecord[0],
 				direction: tripRecord[4],
 				block_id: tripRecord[5],
-				service_id: tripRecord[1],
 				min,
 				max,
+				service_id: tripRecord[1],
 			});
 		}
 

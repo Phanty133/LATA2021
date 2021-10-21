@@ -8,7 +8,7 @@ const checkDate = new Date(2021, 0, 5);
 const tripDataPath = path.join(__dirname, "processed-data", "trip_intervals.csv");
 const calendarDataPath = path.join(__dirname, "data", "calendar-01.csv");
 const calendarDatesDataPath = path.join(__dirname, "data", "calendar_dates-01.csv");
-const outputPath = path.join(__dirname, "processed-data", "trips_filtered-01.01.csv");
+const outputPath = path.join(__dirname, "processed-data", "trips_filtered-05.01.csv");
 const checkDateNum = checkDate.getDate();
 const checkDay = checkDate.getDay() === 0 ? 6 : checkDate.getDay() - 1;
 
@@ -77,7 +77,7 @@ interface ServiceException {
 	process.stdout.write("Processing data... ");
 
 	for await (const tripRecord of tripParser) {
-		const service_id: string = tripRecord[3];
+		const service_id: string = tripRecord[5];
 		let serviceActiveException = false;
 
 		if (service_id in serviceExceptions) {
