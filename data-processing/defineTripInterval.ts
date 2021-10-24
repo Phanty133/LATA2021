@@ -3,9 +3,12 @@ import csvstringify from "csv-stringify";
 import fse from "fs-extra";
 import path from "path";
 
-const tripInput = path.join(__dirname, "data", "trips-01.csv");
-const stopTimeInput = path.join(__dirname, "data", "stop_times-01.csv");
-const outputPath = path.join(__dirname, "processed-data", "trip_intervals.csv");
+const date = new Date(2021, process.argv[2] ? Number(process.argv[2]) : 0, process.argv[3] ? Number(process.argv[3]) : 1);
+const monthStr = (date.getMonth() + 1).toString().length === 1 ? `0${date.getMonth() + 1}` : (date.getMonth() + 1).toString();
+
+const tripInput = path.join(__dirname, "data", process.argv[2], `trips-${monthStr}.csv`);
+const stopTimeInput = path.join(__dirname, "data", process.argv[2], `stop_times-${monthStr}.csv`);
+const outputPath = path.join(__dirname, "processed-data", `trip_intervals-${monthStr}.csv`);
 
 function timeToMinTimestamp(time12Hr: string) {
 	const splitTimeRaw = time12Hr.split(" ");
@@ -22,6 +25,7 @@ interface ParsedTrip {
 	service_id: string,
 	min: number,
 	max: number,
+	trip_id: string,
 }
 
 interface Stop{
@@ -102,6 +106,7 @@ interface Stop{
 				min,
 				max,
 				service_id: tripRecord[1],
+				trip_id: tripID
 			});
 		}
 

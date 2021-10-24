@@ -3,11 +3,16 @@ import fse from "fs-extra";
 import path from "path";
 import csvstringify from "csv-stringify";
 
-const eticketDataPath = path.join(__dirname, "processed-data", "etaloni-01.01.csv");
-const tripDataPath = path.join(__dirname, "processed-data", "trips_filtered-01.01.csv");
-const outputPath = path.join(__dirname, "processed-data", "block-vehicle_dict_01.01.csv");
+const date = new Date(2021, process.argv[2] ? Number(process.argv[2]) : 0, process.argv[3] ? Number(process.argv[3]) : 1);
+const dateDayStr: string = date.getDate().toString().length === 1 ? `0${date.getDate()}` : date.getDate().toString();
+const monthStr: string = (date.getMonth() + 1).toString().length === 1 ? `0${date.getMonth() + 1}` : (date.getMonth() + 1).toString();
+const dateStr = `${dateDayStr}.${monthStr}`;
 
-const maxOutliers = 2;
+const eticketDataPath = path.join(__dirname, "temp", `etaloni-${dateStr}.csv`);
+const tripDataPath = path.join(__dirname, "temp", `trips_filtered-${dateStr}.csv`);
+const outputPath = path.join(__dirname, "temp", `block_vehicle_dict-${dateStr}.dict`);
+
+const maxOutliers = 1;
 const maxLowerTimeDeviation = 5;
 const maxUpperTimeDeviation = 5;
 
@@ -205,6 +210,11 @@ function checkVehicleDuplicates(tIDs: string[]) {
 	console.log(`Blocks without possible transports: ${emptyTransportFilters}`);
 
 	checkVehicleDuplicates(Object.keys(vehicleBlockLocations));
+
+	// jank
+	for (const block of Object.keys(vehicleBlockDictMult)) {
+		vehicleBlockDictMult[block].splice(0, 0, vehicleBlockDictMult[block].length.toString());
+	}
 
 	const outputData = Object.keys(vehicleBlockDictMult).map((id) => [id, ...vehicleBlockDictMult[id]]);
 

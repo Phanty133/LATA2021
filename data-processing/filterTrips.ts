@@ -3,14 +3,17 @@ import csvstringify from "csv-stringify";
 import fse from "fs-extra";
 import path from "path";
 
-const checkDate = new Date(2021, 0, 5);
+const date = new Date(2021, process.argv[2] ? Number(process.argv[2]) : 0, process.argv[3] ? Number(process.argv[3]) : 1);
+const dateDayStr: string = date.getDate().toString().length === 1 ? `0${date.getDate()}` : date.getDate().toString();
+const monthStr: string = (date.getMonth() + 1).toString().length === 1 ? `0${date.getMonth() + 1}` : (date.getMonth() + 1).toString();
+const dateStr = `${dateDayStr}.${monthStr}`;
 
-const tripDataPath = path.join(__dirname, "processed-data", "trip_intervals.csv");
-const calendarDataPath = path.join(__dirname, "data", "calendar-01.csv");
-const calendarDatesDataPath = path.join(__dirname, "data", "calendar_dates-01.csv");
-const outputPath = path.join(__dirname, "processed-data", "trips_filtered-05.01.csv");
-const checkDateNum = checkDate.getDate();
-const checkDay = checkDate.getDay() === 0 ? 6 : checkDate.getDay() - 1;
+const tripDataPath = path.join(__dirname, "processed-data", `trip_intervals-${monthStr}.csv`);
+const calendarDataPath = path.join(__dirname, "data", process.argv[2], `calendar-${monthStr}.csv`);
+const calendarDatesDataPath = path.join(__dirname, "data", process.argv[2], `calendar_dates-${monthStr}.csv`);
+const outputPath = path.join(__dirname, "temp", `trips_filtered-${dateStr}.csv`);
+const checkDateNum = date.getDate();
+const checkDay = date.getDay() === 0 ? 6 : date.getDay() - 1;
 
 interface Trip {
 	route_id: string,
