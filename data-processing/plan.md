@@ -32,4 +32,7 @@ Multiple views:
      1. Calculate the sum of all passsengers on the route
      2. Determine the trip with the highest number of passengers
      3. Calculate the relative activity of each trip by comapring it to the most active trip (trip / trip_max)
-   - ???
+   - Relative stop activity for a single trip
+     1. Calculate the sum of all passsengers on the trip
+     2. Determine the stop with the highest number of passengers
+     3. Calculate the relative activity of each stop by comapring it to the most active stop (stop / stop_max)
