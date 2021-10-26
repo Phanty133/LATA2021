@@ -29,9 +29,9 @@
 	]
 ```
 
-### **GET** `/api/data/stops` Returns the stops of a route
+### **GET** `/api/data/stops` Returns the stops of a trip
 #### Parameters
-- `route` - STRING - Route ID
+- `trip` - STRING - Trip ID
 #### Returns
 ```
 	[
