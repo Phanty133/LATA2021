@@ -4,3 +4,4 @@ data-processing/node_modules
 data-processing/data/*
 data-processing/processed-data/*
 server/node_modules
+server/dist/*
