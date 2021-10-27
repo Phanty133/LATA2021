@@ -1,6 +1,11 @@
-## Data processing script description
+# Busify
 
-- `minifyValidations.ts` - Aggregates similar e-ticket validations from the same minute of the same vehicle
-- `filterTrips.ts` - Filters out the trips that don't occur on the given date by service_id
-- `defineTripInterval.ts` - Determines the time the trip takes place
-- `matchVehicles.ts` - Matches block_id to vehicle ID
+A tool for predicting the number of passengers in Rīgas Satiksme's transport.
+Created for Skolas 2021.
+
+Available at https://towergame.github.io/LATA2021Front/.
+
+### Branches
+- master - Data processing pipeline
+- heroku-api - Data API deployed on Heroku
+- front-end - React-based front-end hosted on Github Pages
