@@ -77,7 +77,7 @@ activityRouter.get("/routes", async (req, res) => {
 			sendData.push({
 				...doc,
 				passengers: doc.passengers[hour],
-				relativeActivity: doc.passengers[hour] / maxPassengers,
+				relativeActivity: Math.round(doc.passengers[hour] / maxPassengers * 1000) / 1000,
 			});
 		}
 	}
