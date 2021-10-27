@@ -29,7 +29,7 @@ class App extends React.Component<Propane, any> {
 			autoHour: false,
 			currMenu: OpenableMenus.NONE
 		};
-		setInterval(this.updateThing.bind(this), 3000);
+		setInterval(this.updateThing.bind(this), 1500);
 	}
 
 	componentDidMount() {
@@ -56,7 +56,7 @@ class App extends React.Component<Propane, any> {
 			// mode: "cors",
 			method: "GET"
 		};
-		fetch(`http://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDay()}&hour=${this.state.hour}&client=true`, requestInit)
+		fetch(`http://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&client=true&simpleShape=true`, requestInit)
 			.then((response) => response.json())
 			.then((response: any[]) => {
 				this.bus.clearLayers();
@@ -64,13 +64,13 @@ class App extends React.Component<Propane, any> {
 				this.trolleybus.clearLayers();
 				response.forEach((a) => {
 					let id = a.routeId;
-					let passengers = a.passengers / 100;
+					let passengers = a.relativeActivity;
 					let name = a.longName;
 					let num = a.shortName;
 					let type = a.type;
 					if (a.shape === undefined) return;
-					let shape = a.shape["a-b"] as LatLng[];
-					this.showRoute(shape, passengers, "(" + num + ") " + name, id, type);
+					let shape = a.shape as LatLng[];
+					this.showRoute(shape, passengers, "(" + num + ") " + name + "<br/>" + a.passengers + " passengers", id, type);
 				});
 			});
 	}
@@ -113,7 +113,7 @@ class App extends React.Component<Propane, any> {
 	}
 
 	showRoute(shape: LatLng[], activity: number, name: string, id: string, type: number) {
-		let polyline = L.polyline(shape, { color: this.getColour(activity), weight: 10 })
+		let polyline = L.polyline(shape, { color: this.getColour(activity), weight: 10, opacity: 0.5 })
 			.bindTooltip(name, { sticky: true });
 		polyline
 			.addEventListener("mouseover", () => { this.onRouteHoverOn(id) })
@@ -237,18 +237,18 @@ class App extends React.Component<Propane, any> {
 						}} /><br />
 					</div>
 					<div id="routeList" className="listClose">
-						<input id="routeDrawer" value={"R\nO\nU\nT\nE\nS"} type="button" onClick={() => { this.openMenu(OpenableMenus.ROUTE) }} />
+						<input id="routeDrawer" value={"R\nO\nU\nT\nE\nS"} type="button" hidden onClick={() => { this.openMenu(OpenableMenus.ROUTE) }} />
 						<div id="actualRouteList">
 						</div>
 					</div>
 					<div id="tripList" className="listClose">
-						<input id="tripDrawer" value={"T\nR\nI\nP\nS"} type="button" onClick={() => { this.openMenu(OpenableMenus.TRIP) }} />
+						<input id="tripDrawer" value={"T\nR\nI\nP\nS"} type="button" hidden onClick={() => { this.openMenu(OpenableMenus.TRIP) }} />
 						<div id="actualTripList">
 
 						</div>
 					</div>
 					<div id="stopList" className="listClose">
-						<input id="stopDrawer" value={"S\nT\nO\nP\nS"} type="button" onClick={() => { this.openMenu(OpenableMenus.STOP) }} />
+						<input id="stopDrawer" value={"S\nT\nO\nP\nS"} type="button" hidden onClick={() => { this.openMenu(OpenableMenus.STOP) }} />
 						<div id="actualStopList">
 
 						</div>
