@@ -173,5 +173,93 @@ activityRouter.get("/trips", async (req, res) => {
 });
 
 activityRouter.get("/stops", async (req, res) => {
-	res.sendStatus(501);
+	if (activityDb === null || staticDb === null) {
+		res.sendStatus(500);
+		return;
+	}
+
+	if (!req.query.month) {
+		res.status(400).send("No month provided");
+		return;
+	}
+
+	if (!req.query.day) {
+		res.status(400).send("No day provided");
+		return;
+	}
+
+	if (!req.query.hour) {
+		res.status(400).send("No hour provided");
+	}
+
+	if (!req.query.route) {
+		res.status(400).send("No route ID provided");
+		return;
+	}
+
+	const month = Number(req.query.month);
+	const day = Number(req.query.day);
+	const hour = Number(req.query.hour);
+
+	if (month < 0 || month > 11) {
+		res.status(400).send("Invalid month");
+		return;
+	}
+
+	if (day < 1 || day > 31) {
+		res.status(400).send("Invalid day");
+		return;
+	}
+
+	if (hour < 0 || hour > 23) {
+		res.status(400).send("Invalid hour");
+	}
+
+	const tripData = await staticDb.collection("trips").find({
+		routeId: req.query.route.toString(),
+		start: {$gt: hour * 60 - 30, $lt: hour * 60 + 90},
+		direction: 0,
+	}).toArray();
+
+	const tripIds = tripData.map((e) => e.tripId);
+
+	const dbStopData = await activityDb.collection("stopValidations").find({
+		tripId: { $in: tripIds },
+	}).toArray();
+
+	let stops: Record<string, any> = [];
+
+	for (const stop of dbStopData) {
+		if (stop.stopId in stops) {
+			stops[stop.stopId].passengers += stop.passengers[day - 1];
+		} else {
+			stops[stop.stopId] = {
+				stopId: stop.stopId,
+				month: stop.month,
+				coord: stop.coord,
+				passengers: stop.passengers[day - 1],
+			}
+		}
+	}
+
+	const stopData = Object.values(stops);
+	const stopIds = stopData.map((e) => e.stopId);
+
+	const stopLocations = await staticDb.collection("stops").find({
+		stopId: {$in: stopIds}
+	}).toArray();
+
+	let maxPassengers = 1;
+
+	for (const stopDoc of stopData) {
+		if (stopDoc.passengers > maxPassengers) maxPassengers = stopDoc.passengers;
+	}
+
+	for (const stopDoc of stopData) {
+		const activityRatio = stopDoc.passengers / maxPassengers;
+		stopDoc.relativeActivity = Math.round(activityRatio * 1000) / 1000;
+		stopDoc.coord = stopLocations.find((doc) => doc.stopId === stopDoc.stopId)?.coord;
+	}
+
+	res.json(stopData);
 });
