@@ -146,10 +146,22 @@ activityRouter.get("/trips", async (req, res) => {
 	const data = await activityDb.collection("tripValidations").find(findQuery, { projection: { _id: 0 } }).toArray();
 	const sendData: any[] = [];
 
+	let maxPassengers = 1;
+
 	for (const doc of data) {
 		if (!(day in doc.passengers)) continue;
 
-		sendData.push({ ...doc, passengers: doc.passengers[day] });
+		if (maxPassengers < doc.passengers[day]) maxPassengers = doc.passengers[day];
+	}
+
+	for (const doc of data) {
+		if (!(day in doc.passengers)) continue;
+
+		sendData.push({
+			...doc,
+			passengers: doc.passengers[day],
+			relativeActivity: Math.round(doc.passengers[day] / maxPassengers * 1000) / 1000,
+		});
 	}
 
 	res.json(req.query.trip ? sendData[0] : sendData);
