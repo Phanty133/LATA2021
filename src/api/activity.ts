@@ -90,7 +90,12 @@ activityRouter.get("/routes", async (req, res) => {
 			
 			if (!activityEntry) continue;
 
-			entry.shape = activityEntry.shape;
+			if (req.query.simpleShape === "true") {
+				entry.shape = activityEntry.shape["a-b"];
+			} else {
+				entry.shape = activityEntry.shape;
+			}
+			
 			entry.longName = activityEntry.longName;
 			entry.shortName = activityEntry.shortName;
 			entry.type = activityEntry.type;
