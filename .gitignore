@@ -3,5 +3,5 @@ data-processing/node_modules
 *.xlsx#
 data-processing/data/*
 data-processing/processed-data/*
-server/node_modules
-server/dist/*
+node_modules
+dist/*
