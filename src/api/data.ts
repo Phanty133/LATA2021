@@ -16,7 +16,15 @@ dataRouter.get("/routes", async (req, res) => {
 		return;
 	}
 
-	res.json(await staticDb.collection("routes").find({}, { projection: { _id: 0 } }).toArray());
+	const data = await staticDb.collection("routes").find({}, { projection: { _id: 0 } }).toArray();
+
+	if (req.query.simpleShape === "true") {
+		for (const doc of data) {
+			doc.shape = doc.shape["a-b"];
+		}
+	}
+
+	res.json(data);
 });
 
 dataRouter.get("/trips", async (req, res) => {

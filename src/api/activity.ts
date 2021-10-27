@@ -221,6 +221,8 @@ activityRouter.get("/stops", async (req, res) => {
 		direction: 0,
 	}).toArray();
 
+	console.log(tripData);
+
 	const tripIds = tripData.map((e) => e.tripId);
 
 	const dbStopData = await activityDb.collection("stopValidations").find({
