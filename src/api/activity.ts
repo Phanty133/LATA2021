@@ -79,7 +79,7 @@ activityRouter.get("/routes", async (req, res) => {
 			if (!activityEntry) continue;
 
 			entry.shape = activityEntry.shape;
-			entry.fullName = activityEntry.fullName;
+			entry.longName = activityEntry.longName;
 			entry.shortName = activityEntry.shortName;
 			entry.type = activityEntry.type;
 			entry.url = activityEntry.url;
