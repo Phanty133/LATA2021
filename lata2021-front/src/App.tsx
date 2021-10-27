@@ -52,20 +52,20 @@ class App extends React.Component<Propane, any> {
 	}
 
 	setUpRoutes() {
-		this.bus.clearLayers();
-		this.tram.clearLayers();
-		this.trolleybus.clearLayers();
 		var requestInit: RequestInit = {
-			mode: "cors",
+			// mode: "cors",
 			method: "GET"
 		};
-		fetch(`http://localhost:8080/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDay()}&hour=${this.state.hour}&client=true`, requestInit)
+		fetch(`http://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDay()}&hour=${this.state.hour}&client=true`, requestInit)
 			.then((response) => response.json())
 			.then((response: any[]) => {
+				this.bus.clearLayers();
+				this.tram.clearLayers();
+				this.trolleybus.clearLayers();
 				response.forEach((a) => {
 					let id = a.routeId;
 					let passengers = a.passengers / 100;
-					let name = a.fullName;
+					let name = a.longName;
 					let num = a.shortName;
 					let type = a.type;
 					if (a.shape === undefined) return;
@@ -115,6 +115,10 @@ class App extends React.Component<Propane, any> {
 	showRoute(shape: LatLng[], activity: number, name: string, id: string, type: number) {
 		let polyline = L.polyline(shape, { color: this.getColour(activity), weight: 10 })
 			.bindTooltip(name, { sticky: true });
+		polyline
+			.addEventListener("mouseover", () => { this.onRouteHoverOn(id) })
+			.addEventListener("mouseout", () => { this.onRouteHoverOff(id) });
+		this.lineMap.set(id, polyline);
 		switch (type) {
 			case 0:
 				this.bus.addLayer(polyline);
@@ -126,10 +130,6 @@ class App extends React.Component<Propane, any> {
 				this.tram.addLayer(polyline);
 				break;
 		}
-		this.lineMap.set(id, polyline);
-		polyline
-			.addEventListener("mouseover", () => { this.onRouteHoverOn(id) })
-			.addEventListener("mouseout", () => { this.onRouteHoverOff(id) });
 	}
 
 	updateThing() {
