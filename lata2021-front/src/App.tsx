@@ -1,6 +1,8 @@
 import React from 'react';
 import './App.css';
-import L, { LatLng, Polyline, LayerGroup } from "leaflet";
+import L, { LatLng, Polyline, LayerGroup, Point, LatLngBounds, Marker } from "leaflet";
+import { SVGIcon } from "./SVGIcon";
+import MarkerSVG from "./marker.svg";
 
 interface Propane {
 }
@@ -16,9 +18,13 @@ enum OpenableMenus {
 class App extends React.Component<Propane, any> {
 	map: L.Map | null = null;
 	lineMap: Map<string, Polyline> = new Map<string, Polyline>();
+	routes: Map<string, LatLng[]> = new Map<string, LatLng[]>();
+	names: Map<string, string[]> = new Map<string, string[]>(); //0 short 1 long
+	types: Map<string, number> = new Map<string, number>();
 	bus: LayerGroup = new LayerGroup();
 	tram: LayerGroup = new LayerGroup();
 	trolleybus: LayerGroup = new LayerGroup();
+	markerGroup: LayerGroup = new LayerGroup();
 
 	constructor(props: Propane) {
 		super(props);
@@ -27,9 +33,10 @@ class App extends React.Component<Propane, any> {
 			date: new Date("2021-01-01"),
 			hour: new Date().getHours(),
 			autoHour: false,
-			currMenu: OpenableMenus.NONE
+			currMenu: OpenableMenus.NONE,
+			currSelect: ""
 		};
-		setInterval(this.updateThing.bind(this), 1500);
+		setInterval(this.updateThing.bind(this), 500);
 	}
 
 	componentDidMount() {
@@ -48,35 +55,122 @@ class App extends React.Component<Propane, any> {
 			accessToken: 'iKbn4srGwDR8o2IxGUP8skNZ8T7AVxUrCiBvpwxYzLLRtSGXGhlY9W20wBr182yM'
 		});
 		Jawg_Dark.addTo(this.map);
-		this.setUpRoutes();
+		this.markerGroup.addTo(this.map);
+		// this.setUpRoutes();
+		this.cacheRoutes();
+		this.bus.addTo(this.map!);
+		(document.getElementById("busCheck")! as HTMLInputElement).checked = true;
+	}
+
+	cacheRoutes() {
+		var requestInit: RequestInit = {
+			mode: "cors",
+			method: "GET"
+		};
+		fetch(`https://busify.herokuapp.com/api/data/routes?simpleShape=true`, requestInit)
+			.then((response) => response.json())
+			.then((response: any[]) => {
+				response.forEach(a => {
+					this.routes.set(a.routeId, a.shape);
+					this.names.set(a.routeId, [a.shortName, a.longName]);
+					this.types.set(a.routeId, a.type);
+				});
+			}).then(() => {
+				this.setUpRoutes();
+			});
 	}
 
 	setUpRoutes() {
 		var requestInit: RequestInit = {
-			// mode: "cors",
+			mode: "cors",
 			method: "GET"
 		};
-		fetch(`http://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&client=true&simpleShape=true`, requestInit)
+		fetch(`https://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&simpleShape=true`, requestInit)
 			.then((response) => response.json())
 			.then((response: any[]) => {
 				this.bus.clearLayers();
 				this.tram.clearLayers();
 				this.trolleybus.clearLayers();
 				response.forEach((a) => {
-					let id = a.routeId;
+					let id = a.id;
 					let passengers = a.relativeActivity;
-					let name = a.longName;
-					let num = a.shortName;
-					let type = a.type;
-					if (a.shape === undefined) return;
-					let shape = a.shape as LatLng[];
+					if (this.names.get(id) === undefined) return;
+					let name = this.names.get(id)![1];
+					let num = this.names.get(id)![0];
+					let type = this.types.get(id)!;
+					let shape = this.routes.get(id)!;
+					if (shape === undefined) return;
 					this.showRoute(shape, passengers, "(" + num + ") " + name + "<br/>" + a.passengers + " passengers", id, type);
 				});
 			});
 	}
 
+	generateStopRoute(routeId: string, routePath: Polyline) {
+		let stopPoints: LatLng[] = [];
+		let amountsPerStop: number[] = [];
+		var requestInit: RequestInit = {
+			mode: "cors",
+			method: "GET"
+		};
+		if (this.state.currSelect !== "") {
+			this.clearer();
+			return;
+		}
+		fetch(`https://busify.herokuapp.com/api/activity/stops?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&client=true&route=${routeId}`, requestInit)
+			.then((response) => response.json())
+			.then((response: any[]) => {
+				this.markerGroup.clearLayers();
+				response.forEach((a) => {
+					// stopPoints.push(a.coord as LatLng);
+					// amountsPerStop.push(a.relativeActivity);
+					this.setState({
+						date: this.state.date,
+						hour: this.state.hour,
+						autoHour: this.state.autoHour,
+						currMenu: this.state.currMenu,
+						currSelect: routeId
+					});
+					//this.forceDarken(routeId);
+					let marker = new Marker(a.coord, {
+						icon: new SVGIcon({
+							svgLink: MarkerSVG,
+							iconAnchor: [16, 16],
+							iconSize: new L.Point(32, 32),
+							color: this.getColour(a.relativeActivity)
+						})
+					})
+						// .bindTooltip("Passengers: " + a.passengers)
+						.addTo(this.markerGroup);
+				});
+				return "swag";
+			}).then(a => {
+				// let endRes = new Map<LatLng[], number>();
+				// let lngs = routePath.getLatLngs() as LatLng[];
+				// for (let x = 0; x < stopPoints.length - 1; x++) {
+				// 	let point1 = this.map!.layerPointToLatLng(routePath.closestLayerPoint(this.map!.latLngToLayerPoint(stopPoints[x])));
+				// 	let point2 = this.map!.layerPointToLatLng(routePath.closestLayerPoint(this.map!.latLngToLayerPoint(stopPoints[x + 1])));
+				// 	let cool: LatLng[] = [];
+				// 	console.table(lngs.indexOf([...lngs].sort((a, b) => { return point1.distanceTo(a) - point1.distanceTo(b) })[0]) - lngs.indexOf([...lngs].sort((a, b) => { return point2.distanceTo(a) - point2.distanceTo(b) })[0]) + 1);
+				// 	for (let y = lngs.indexOf([...lngs].sort((a, b) => { return point1.distanceTo(a) - point1.distanceTo(b) })[0]); y < lngs.indexOf([...lngs].sort((a, b) => { return point2.distanceTo(a) - point2.distanceTo(b) })[0]) + 1; y++) {
+				// 		cool.push(lngs[y]);
+				// 	}
+				// 	endRes.set(cool, amountsPerStop[x]);
+				// }
+				// this.paintSegments(endRes);
+			});
+	}
+
+	paintSegments(segmentData: Map<LatLng[], number>) {
+		segmentData.forEach((v, k) => {
+			let polyline = L.polyline(k, { color: this.getColour(v), weight: 10, opacity: 0.5 });
+			polyline.addTo(this.map!);
+			// this.lineMap.set(id, polyline);
+		});
+	}
+
 	getColour(between: number) {
-		return "rgb(" + (255 * (1 - between)) + "," + (255 * between) + ",0)";
+		let act = Math.log(100 * between + 1) / Math.log(100);
+		return "rgb(" + (255 * act) + "," + (255 * (1 - act)) + ",0)";
 	}
 
 	changeLight(colour: string, amount: number) {
@@ -93,20 +187,56 @@ class App extends React.Component<Propane, any> {
 	}
 
 	onRouteHoverOn(id: string) {
+		// if (this.state.currSelect !== "") return;
 		this.lineMap.forEach((v, k) => {
 			if (k !== id) {
 				v.setStyle({
-					color: this.changeLight(this.lineMap.get(k)!.options.color!, -2)
+					color: this.changeLight(this.lineMap.get(k)!.options.color!, -2),
+					opacity: 0.1
+				});
+			} else {
+				v.setStyle({
+					color: this.changeLight(this.lineMap.get(k)!.options.color!, 2),
+					opacity: 1
+				});
+			}
+		});
+	}
+
+	forceDarken(id: string) {
+		this.lineMap.forEach((v, k) => {
+			if (k !== id) {
+				v.setStyle({
+					color: this.changeLight(this.lineMap.get(k)!.options.color!, -2),
+					opacity: 0.1
 				});
 			}
 		});
 	}
 
 	onRouteHoverOff(id: string) {
+		// if (this.state.currSelect !== "") return;
 		this.lineMap.forEach((v, k) => {
 			if (k !== id) {
 				v.setStyle({
-					color: this.changeLight(this.lineMap.get(k)!.options.color!, 2)
+					color: this.changeLight(this.lineMap.get(k)!.options.color!, 2),
+					opacity: 0.5
+				});
+			} else {
+				v.setStyle({
+					color: this.changeLight(this.lineMap.get(k)!.options.color!, -2),
+					opacity: 0.5
+				});
+			}
+		});
+	}
+
+	forceUndarken(id: string) {
+		this.lineMap.forEach((v, k) => {
+			if (k !== id) {
+				v.setStyle({
+					color: this.changeLight(this.lineMap.get(k)!.options.color!, 2),
+					opacity: 0.5
 				});
 			}
 		});
@@ -117,7 +247,8 @@ class App extends React.Component<Propane, any> {
 			.bindTooltip(name, { sticky: true });
 		polyline
 			.addEventListener("mouseover", () => { this.onRouteHoverOn(id) })
-			.addEventListener("mouseout", () => { this.onRouteHoverOff(id) });
+			.addEventListener("mouseout", () => { this.onRouteHoverOff(id) })
+			.addEventListener("click", () => { this.generateStopRoute(id, this.lineMap.get(id)!) });
 		this.lineMap.set(id, polyline);
 		switch (type) {
 			case 0:
@@ -134,11 +265,13 @@ class App extends React.Component<Propane, any> {
 
 	updateThing() {
 		if (this.state.autoHour) {
+			let _ = this.state.hour + 1 > 23 ? (this.state.date as Date).getDate() + 1 > 31 ? (this.state.date as Date).setDate(1) : (this.state.date as Date).setDate((this.state.date as Date).getDate() + 1) : this.state.date;
 			this.setState({
 				date: this.state.date,
 				hour: this.state.hour + 1 > 23 ? 0 : this.state.hour + 1,
 				autoHour: this.state.autoHour,
-				currMenu: this.state.currMenu
+				currMenu: this.state.currMenu,
+				currSelect: this.state.currSelect
 			});
 			this.setUpRoutes();
 		}
@@ -178,16 +311,30 @@ class App extends React.Component<Propane, any> {
 				date: this.state.date,
 				hour: this.state.hour,
 				autoHour: this.state.autoHour,
-				currMenu: menuType
+				currMenu: menuType,
+				currSelect: this.state.currSelect
 			});
 		} else {
 			this.setState({
 				date: this.state.date,
 				hour: this.state.hour,
 				autoHour: this.state.autoHour,
-				currMenu: OpenableMenus.NONE
+				currMenu: OpenableMenus.NONE,
+				currSelect: this.state.currSelect
 			});
 		}
+	}
+
+	clearer() {
+		// this.forceUndarken(this.state.currSelect);
+		this.setState({
+			date: this.state.date,
+			hour: this.state.hour,
+			autoHour: this.state.autoHour,
+			currMenu: this.state.currMenu,
+			currSelect: ""
+		});
+		this.markerGroup.clearLayers();
 	}
 
 	render() {
@@ -200,25 +347,31 @@ class App extends React.Component<Propane, any> {
 							date: new Date(e.target.value!),
 							hour: this.state.hour,
 							autoHour: this.state.autoHour,
-							currMenu: this.state.currMenu
+							currMenu: this.state.currMenu,
+							currSelect: this.state.currSelect
 						});
 						this.setUpRoutes();
 					}} />
 					<h1 id="time">{this.state.hour}:00</h1>
-					<input type="checkbox" id="autoHour" value={this.state.autoHour} onChange={(e) => {
-						this.setState({
-							date: this.state.date,
-							hour: this.state.hour,
-							autoHour: e.target.checked,
-							currMenu: this.state.currMenu
-						});
-					}} />
+					<div className="autoHourDiv">
+						<input type="checkbox" id="autoHour" value={this.state.autoHour} onChange={(e) => {
+							this.setState({
+								date: this.state.date,
+								hour: this.state.hour,
+								autoHour: e.target.checked,
+								currMenu: this.state.currMenu,
+								currSelect: this.state.currSelect
+							});
+						}} />
+						<label htmlFor="autoHour"></label>
+					</div>
 					<input type="range" id="selectHour" min={0} max={23} value={this.state.hour} onChange={(e) => {
 						this.setState({
 							date: this.state.date,
 							hour: e.target.valueAsNumber,
 							autoHour: this.state.autoHour,
-							currMenu: this.state.currMenu
+							currMenu: this.state.currMenu,
+							currSelect: this.state.currSelect
 						});
 						this.setUpRoutes();
 					}} />
@@ -226,14 +379,17 @@ class App extends React.Component<Propane, any> {
 						Bus <input type="checkbox" onChange={(e) => {
 							if (e.target.checked) this.bus.addTo(this.map!);
 							else this.bus.removeFrom(this.map!);
-						}} /><br />
+							this.clearer();
+						}} id="busCheck" /><br />
 						Tram <input type="checkbox" onChange={(e) => {
 							if (e.target.checked) this.tram.addTo(this.map!);
 							else this.tram.removeFrom(this.map!);
+							this.clearer();
 						}} /><br />
 						Trolleybus <input type="checkbox" onChange={(e) => {
 							if (e.target.checked) this.trolleybus.addTo(this.map!);
 							else this.trolleybus.removeFrom(this.map!);
+							this.clearer();
 						}} /><br />
 					</div>
 					<div id="routeList" className="listClose">
