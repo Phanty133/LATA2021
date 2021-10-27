@@ -144,5 +144,5 @@ activityRouter.get("/trips", async (req, res) => {
 });
 
 activityRouter.get("/stops", async (req, res) => {
-
+	res.sendStatus(501);
 });
