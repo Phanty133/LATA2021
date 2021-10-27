@@ -5,3 +5,4 @@ data-processing/data/*
 data-processing/processed-data/*
 node_modules
 dist/*
+.env

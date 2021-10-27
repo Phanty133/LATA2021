@@ -1,5 +1,5 @@
 import express from "express";
-import { Db } from "mongodb";
+import { ConnectionCheckOutFailedEvent, Db } from "mongodb";
 import { db } from "../db";
 
 export const activityRouter = express.Router();
@@ -63,10 +63,22 @@ activityRouter.get("/routes", async (req, res) => {
 	if (hour === null) {
 		sendData = data;
 	} else {
+		let maxPassengers: number = 1; // Non-zero to not divide by zero in case no passengers exist
+
 		for (const doc of data) {
 			if (!(hour in doc.passengers)) continue;
 
-			sendData.push({ ...doc, passengers: doc.passengers[hour] });
+			if (maxPassengers < doc.passengers[hour]) maxPassengers = doc.passengers[hour];
+		}
+
+		for (const doc of data) {
+			if (!(hour in doc.passengers)) continue;
+
+			sendData.push({
+				...doc,
+				passengers: doc.passengers[hour],
+				relativeActivity: doc.passengers[hour] / maxPassengers,
+			});
 		}
 	}
 
