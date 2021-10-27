@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import L, { LatLng, Polyline } from "leaflet";
+import L, { LatLng, Polyline, LayerGroup } from "leaflet";
 
 interface Propane {
 }
@@ -16,6 +16,9 @@ enum OpenableMenus {
 class App extends React.Component<Propane, any> {
 	map: L.Map | null = null;
 	lineMap: Map<string, Polyline> = new Map<string, Polyline>();
+	bus: LayerGroup = new LayerGroup();
+	tram: LayerGroup = new LayerGroup();
+	trolleybus: LayerGroup = new LayerGroup();
 
 	constructor(props: Propane) {
 		super(props);
@@ -26,7 +29,7 @@ class App extends React.Component<Propane, any> {
 			autoHour: false,
 			currMenu: OpenableMenus.NONE
 		};
-		setInterval(this.updateThing.bind(this), 1000);
+		setInterval(this.updateThing.bind(this), 3000);
 	}
 
 	componentDidMount() {
@@ -45,8 +48,31 @@ class App extends React.Component<Propane, any> {
 			accessToken: 'iKbn4srGwDR8o2IxGUP8skNZ8T7AVxUrCiBvpwxYzLLRtSGXGhlY9W20wBr182yM'
 		});
 		Jawg_Dark.addTo(this.map);
-		this.showRoute([new LatLng(56.94606, 24.13001), new LatLng(56.94604, 24.12979), new LatLng(56.94602, 24.12920), new LatLng(56.94597, 24.12590), new LatLng(56.94706, 24.12555)], 0.333, "Swag Bus", "sbus");
-		this.showRoute([new LatLng(56.94476, 24.12039), new LatLng(56.94492, 24.12053), new LatLng(56.94451, 24.12119), new LatLng(56.94396, 24.12229), new LatLng(56.94290, 24.12065)], 0.666, "Swag Bus 2", "sbus2");
+		this.setUpRoutes();
+	}
+
+	setUpRoutes() {
+		this.bus.clearLayers();
+		this.tram.clearLayers();
+		this.trolleybus.clearLayers();
+		var requestInit: RequestInit = {
+			mode: "cors",
+			method: "GET"
+		};
+		fetch(`http://localhost:8080/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDay()}&hour=${this.state.hour}&client=true`, requestInit)
+			.then((response) => response.json())
+			.then((response: any[]) => {
+				response.forEach((a) => {
+					let id = a.routeId;
+					let passengers = a.passengers / 100;
+					let name = a.fullName;
+					let num = a.shortName;
+					let type = a.type;
+					if (a.shape === undefined) return;
+					let shape = a.shape["a-b"] as LatLng[];
+					this.showRoute(shape, passengers, "(" + num + ") " + name, id, type);
+				});
+			});
 	}
 
 	getColour(between: number) {
@@ -86,10 +112,20 @@ class App extends React.Component<Propane, any> {
 		});
 	}
 
-	showRoute(shape: LatLng[], activity: number, name: string, id: string) {
+	showRoute(shape: LatLng[], activity: number, name: string, id: string, type: number) {
 		let polyline = L.polyline(shape, { color: this.getColour(activity), weight: 10 })
-			.bindTooltip(name, { sticky: true })
-			.addTo(this.map!);
+			.bindTooltip(name, { sticky: true });
+		switch (type) {
+			case 0:
+				this.bus.addLayer(polyline);
+				break;
+			case 1:
+				this.trolleybus.addLayer(polyline);
+				break;
+			case 2:
+				this.tram.addLayer(polyline);
+				break;
+		}
 		this.lineMap.set(id, polyline);
 		polyline
 			.addEventListener("mouseover", () => { this.onRouteHoverOn(id) })
@@ -104,6 +140,7 @@ class App extends React.Component<Propane, any> {
 				autoHour: this.state.autoHour,
 				currMenu: this.state.currMenu
 			});
+			this.setUpRoutes();
 		}
 	}
 
@@ -164,7 +201,8 @@ class App extends React.Component<Propane, any> {
 							hour: this.state.hour,
 							autoHour: this.state.autoHour,
 							currMenu: this.state.currMenu
-						})
+						});
+						this.setUpRoutes();
 					}} />
 					<h1 id="time">{this.state.hour}:00</h1>
 					<input type="checkbox" id="autoHour" value={this.state.autoHour} onChange={(e) => {
@@ -173,7 +211,7 @@ class App extends React.Component<Propane, any> {
 							hour: this.state.hour,
 							autoHour: e.target.checked,
 							currMenu: this.state.currMenu
-						})
+						});
 					}} />
 					<input type="range" id="selectHour" min={0} max={23} value={this.state.hour} onChange={(e) => {
 						this.setState({
@@ -181,83 +219,26 @@ class App extends React.Component<Propane, any> {
 							hour: e.target.valueAsNumber,
 							autoHour: this.state.autoHour,
 							currMenu: this.state.currMenu
-						})
+						});
+						this.setUpRoutes();
 					}} />
 					<div id="transportTypes">
-						Bus <input type="checkbox" /><br />
-						Tram <input type="checkbox" /><br />
-						Trolleybus <input type="checkbox" /><br />
+						Bus <input type="checkbox" onChange={(e) => {
+							if (e.target.checked) this.bus.addTo(this.map!);
+							else this.bus.removeFrom(this.map!);
+						}} /><br />
+						Tram <input type="checkbox" onChange={(e) => {
+							if (e.target.checked) this.tram.addTo(this.map!);
+							else this.tram.removeFrom(this.map!);
+						}} /><br />
+						Trolleybus <input type="checkbox" onChange={(e) => {
+							if (e.target.checked) this.trolleybus.addTo(this.map!);
+							else this.trolleybus.removeFrom(this.map!);
+						}} /><br />
 					</div>
 					<div id="routeList" className="listClose">
 						<input id="routeDrawer" value={"R\nO\nU\nT\nE\nS"} type="button" onClick={() => { this.openMenu(OpenableMenus.ROUTE) }} />
 						<div id="actualRouteList">
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
-							agga<br />
 						</div>
 					</div>
 					<div id="tripList" className="listClose">

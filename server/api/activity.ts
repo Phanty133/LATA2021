@@ -50,7 +50,7 @@ activityRouter.get("/routes", async (req, res) => {
 		if (hour < 0 || hour > 23) {
 			res.status(400).send("Invalid hour");
 			return;
-		}	
+		}
 	}
 
 	const data = await activityDb.collection("routeValidations").find({
@@ -75,7 +75,7 @@ activityRouter.get("/routes", async (req, res) => {
 
 		for (const entry of sendData) {
 			const activityEntry = clientData.find((e) => e.routeId === entry.id);
-			
+
 			if (!activityEntry) continue;
 
 			entry.shape = activityEntry.shape;
