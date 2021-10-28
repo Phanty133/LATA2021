@@ -81,6 +81,9 @@ class App extends React.Component<Propane, any> {
 	}
 
 	setUpRoutes() {
+		let hour = this.state.hour;
+		let day = (this.state.date as Date).getDate();
+		let month = (this.state.date as Date).getMonth();
 		var requestInit: RequestInit = {
 			mode: "cors",
 			method: "GET"
@@ -88,6 +91,7 @@ class App extends React.Component<Propane, any> {
 		fetch(`https://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&simpleShape=true`, requestInit)
 			.then((response) => response.json())
 			.then((response: any[]) => {
+				if (hour !== this.state.hour || day !== (this.state.date as Date).getDate() || month !== (this.state.date as Date).getMonth()) return;
 				this.bus.clearLayers();
 				this.tram.clearLayers();
 				this.trolleybus.clearLayers();
