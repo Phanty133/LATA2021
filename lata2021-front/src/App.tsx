@@ -17,6 +17,7 @@ enum OpenableMenus {
 
 class App extends React.Component<Propane, any> {
 	map: L.Map | null = null;
+	dayMax: number = 1;
 	lineMap: Map<string, Polyline> = new Map<string, Polyline>();
 	routes: Map<string, LatLng[]> = new Map<string, LatLng[]>();
 	names: Map<string, string[]> = new Map<string, string[]>(); //0 short 1 long
@@ -34,7 +35,8 @@ class App extends React.Component<Propane, any> {
 			hour: new Date().getHours(),
 			autoHour: false,
 			currMenu: OpenableMenus.NONE,
-			currSelect: ""
+			currSelect: "",
+			relativeDay: true
 		};
 		setInterval(this.updateThing.bind(this), 500);
 	}
@@ -88,24 +90,30 @@ class App extends React.Component<Propane, any> {
 			mode: "cors",
 			method: "GET"
 		};
-		fetch(`https://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&simpleShape=true`, requestInit)
+		fetch(`https://busify.herokuapp.com/api/activity/routeMax?month=${month + 1}&day=${day}`, requestInit)
 			.then((response) => response.json())
-			.then((response: any[]) => {
-				if (hour !== this.state.hour || day !== (this.state.date as Date).getDate() || month !== (this.state.date as Date).getMonth()) return;
-				this.bus.clearLayers();
-				this.tram.clearLayers();
-				this.trolleybus.clearLayers();
-				response.forEach((a) => {
-					let id = a.id;
-					let passengers = a.relativeActivity;
-					if (this.names.get(id) === undefined) return;
-					let name = this.names.get(id)![1];
-					let num = this.names.get(id)![0];
-					let type = this.types.get(id)!;
-					let shape = this.routes.get(id)!;
-					if (shape === undefined) return;
-					this.showRoute(shape, passengers, "(" + num + ") " + name + "<br/>" + a.passengers + " passengers", id, type);
-				});
+			.then((response: any) => {
+				this.dayMax = response.max;
+			}).then(() => {
+				fetch(`https://busify.herokuapp.com/api/activity/routes?month=${(this.state.date as Date).getMonth() + 1}&day=${(this.state.date as Date).getDate()}&hour=${this.state.hour}&simpleShape=true`, requestInit)
+					.then((response) => response.json())
+					.then((response: any[]) => {
+						if (hour !== this.state.hour || day !== (this.state.date as Date).getDate() || month !== (this.state.date as Date).getMonth()) return;
+						this.bus.clearLayers();
+						this.tram.clearLayers();
+						this.trolleybus.clearLayers();
+						response.forEach((a) => {
+							let id = a.id;
+							let passengers = this.state.relativeDay ? a.passengers / this.dayMax : a.relativeActivity;
+							if (this.names.get(id) === undefined) return;
+							let name = this.names.get(id)![1];
+							let num = this.names.get(id)![0];
+							let type = this.types.get(id)!;
+							let shape = this.routes.get(id)!;
+							if (shape === undefined) return;
+							this.showRoute(shape, passengers, "(" + num + ") " + name + "<br/>" + a.passengers + " passengers", id, type);
+						});
+					});
 			});
 	}
 
@@ -275,9 +283,11 @@ class App extends React.Component<Propane, any> {
 				hour: this.state.hour + 1 > 23 ? 0 : this.state.hour + 1,
 				autoHour: this.state.autoHour,
 				currMenu: this.state.currMenu,
-				currSelect: this.state.currSelect
+				currSelect: this.state.currSelect,
+				relativeDay: this.state.relativeDay
+			}, () => {
+				this.setUpRoutes();
 			});
-			this.setUpRoutes();
 		}
 	}
 
@@ -316,7 +326,8 @@ class App extends React.Component<Propane, any> {
 				hour: this.state.hour,
 				autoHour: this.state.autoHour,
 				currMenu: menuType,
-				currSelect: this.state.currSelect
+				currSelect: this.state.currSelect,
+				relativeDay: this.state.relativeDay
 			});
 		} else {
 			this.setState({
@@ -324,7 +335,8 @@ class App extends React.Component<Propane, any> {
 				hour: this.state.hour,
 				autoHour: this.state.autoHour,
 				currMenu: OpenableMenus.NONE,
-				currSelect: this.state.currSelect
+				currSelect: this.state.currSelect,
+				relativeDay: this.state.relativeDay
 			});
 		}
 	}
@@ -336,7 +348,8 @@ class App extends React.Component<Propane, any> {
 			hour: this.state.hour,
 			autoHour: this.state.autoHour,
 			currMenu: this.state.currMenu,
-			currSelect: ""
+			currSelect: "",
+			relativeDay: this.state.relativeDay
 		});
 		this.markerGroup.clearLayers();
 	}
@@ -346,15 +359,17 @@ class App extends React.Component<Propane, any> {
 			<div className="App">
 				<div id="map" />
 				<div id="GUI">
-					<input type="date" id="selectDate" min="2021-01-01" max="2021-01-31" value={this.state.date.toISOString().split('T')[0]} onChange={(e) => {
+					<input type="date" id="selectDate" required={true} min="2021-01-01" max="2021-01-31" value={this.state.date.toISOString().split('T')[0]} onChange={(e) => {
 						this.setState({
 							date: new Date(e.target.value!),
 							hour: this.state.hour,
 							autoHour: this.state.autoHour,
 							currMenu: this.state.currMenu,
-							currSelect: this.state.currSelect
+							currSelect: this.state.currSelect,
+							relativeDay: this.state.relativeDay
+						}, () => {
+							this.setUpRoutes();
 						});
-						this.setUpRoutes();
 					}} />
 					<h1 id="time">{this.state.hour}:00</h1>
 					<div className="autoHourDiv">
@@ -364,37 +379,54 @@ class App extends React.Component<Propane, any> {
 								hour: this.state.hour,
 								autoHour: e.target.checked,
 								currMenu: this.state.currMenu,
-								currSelect: this.state.currSelect
+								currSelect: this.state.currSelect,
+								relativeDay: this.state.relativeDay
 							});
 						}} />
 						<label htmlFor="autoHour"></label>
 					</div>
-					<input type="range" id="selectHour" min={0} max={23} value={this.state.hour} onChange={(e) => {
+					<input type="range" id="selectHour" className="range" min={0} max={23} value={this.state.hour} onChange={(e) => {
 						this.setState({
 							date: this.state.date,
 							hour: e.target.valueAsNumber,
 							autoHour: this.state.autoHour,
 							currMenu: this.state.currMenu,
-							currSelect: this.state.currSelect
+							currSelect: this.state.currSelect,
+							relativeDay: this.state.relativeDay
+						}, () => {
+							this.setUpRoutes();
 						});
-						this.setUpRoutes();
 					}} />
 					<div id="transportTypes">
-						Bus <input type="checkbox" onChange={(e) => {
-							if (e.target.checked) this.bus.addTo(this.map!);
-							else this.bus.removeFrom(this.map!);
-							this.clearer();
-						}} id="busCheck" /><br />
-						Tram <input type="checkbox" onChange={(e) => {
-							if (e.target.checked) this.tram.addTo(this.map!);
-							else this.tram.removeFrom(this.map!);
-							this.clearer();
-						}} /><br />
-						Trolleybus <input type="checkbox" onChange={(e) => {
-							if (e.target.checked) this.trolleybus.addTo(this.map!);
-							else this.trolleybus.removeFrom(this.map!);
-							this.clearer();
-						}} /><br />
+						<div className="transportTypes">
+							Bus <input type="checkbox" onChange={(e) => {
+								if (e.target.checked) this.bus.addTo(this.map!);
+								else this.bus.removeFrom(this.map!);
+								this.clearer();
+							}} id="busCheck" /><br />
+							Tram <input type="checkbox" onChange={(e) => {
+								if (e.target.checked) this.tram.addTo(this.map!);
+								else this.tram.removeFrom(this.map!);
+								this.clearer();
+							}} /><br />
+							Trolleybus <input type="checkbox" onChange={(e) => {
+								if (e.target.checked) this.trolleybus.addTo(this.map!);
+								else this.trolleybus.removeFrom(this.map!);
+								this.clearer();
+							}} />
+						</div><br /><br />
+						<div className="betweenStuf">Relative to<input className="tgl tgl-flip" id="cb5" checked={this.state.relativeDay} onChange={(e) => {
+							this.setState({
+								date: this.state.date,
+								hour: this.state.hour,
+								autoHour: this.state.autoHour,
+								currMenu: this.state.currMenu,
+								currSelect: this.state.currSelect,
+								relativeDay: e.target.checked
+							}, () => {
+								this.setUpRoutes();
+							});
+						}} type="checkbox" /><label className="tgl-btn" data-tg-off="Hour" data-tg-on="Day" htmlFor="cb5"></label></div><br />
 					</div>
 					<div id="routeList" className="listClose">
 						<input id="routeDrawer" value={"R\nO\nU\nT\nE\nS"} type="button" hidden onClick={() => { this.openMenu(OpenableMenus.ROUTE) }} />
