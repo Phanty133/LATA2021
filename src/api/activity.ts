@@ -16,6 +16,57 @@ let staticDb: Db | null;
 	staticDb = await db.static;
 })();
 
+activityRouter.get("/routeMax", async (req, res) => {
+	if (activityDb === null || staticDb === null) {
+		res.sendStatus(500);
+		return;
+	}
+
+	if (!req.query.month) {
+		res.status(400).send("No month provided");
+		return;
+	}
+
+	if (!req.query.day) {
+		res.status(400).send("No day provided");
+		return;
+	}
+
+	const month = Number(req.query.month);
+	const day = Number(req.query.day);
+
+	const data = await activityDb.collection("routeValidations").aggregate([
+		{
+		  	'$match': {
+				'month': month, 
+				'day': day
+		  	}
+		}, {
+		 	'$project': {
+				'passengers': {
+				  '$objectToArray': '$passengers'
+				}
+		  	}
+		}, {
+		 	'$unwind': {
+				'path': '$passengers'
+		  	}
+		}, {
+		  	'$sort': {
+				'passengers.v': -1
+		  	}
+		}, {
+		  	'$limit': 1
+		}, {
+		  	'$project': {
+				'max': '$passengers.v'
+		  	}
+		}
+	]).toArray();
+
+	res.json({ max: data[0].max });
+});
+
 activityRouter.get("/routes", async (req, res) => {
 	if (activityDb === null || staticDb === null) {
 		res.sendStatus(500);
