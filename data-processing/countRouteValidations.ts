@@ -18,6 +18,31 @@ const tTypeDict: Record<string, string> = {
 	"Tr": "trol"
 };
 
+interface Timestamp {
+	year: number,
+	month: number,
+	date: number,
+	hour: number,
+	minute: number,
+	unix: number,
+}
+
+function parseTimestampEntry(entry: string): Timestamp{
+	const splitStr = entry.split(" ");
+	const dateSplit = splitStr[0].split(".");
+	const timeSplit = splitStr[1].split(":");
+	const unix = Math.floor(Date.parse(`${dateSplit.reverse().join("-")}T${timeSplit[1]}:${timeSplit[0]}:00`) / 1000);
+
+	return {
+		year: Number(dateSplit[2]),
+		month: Number(dateSplit[1]),
+		date: Number(dateSplit[0]),
+		hour: Number(timeSplit[0]),
+		minute: Number(timeSplit[1]),
+		unix, 
+	}
+}
+
 (async () => {
 	process.stdout.write("Reading file... ");
 	const parser = csvparse({ delimiter: ",", fromLine: 2 });
@@ -37,22 +62,17 @@ const tTypeDict: Record<string, string> = {
 		const routeNr = routeSplit[1];
 		const route = `riga_${tTypeDict[tTypeRaw]}_${routeNr}`;
 
-		const timeRaw: string = record[8];
-		const timeSplit = timeRaw.split(" "); // 0 - date, 1 - time
-		const dateReversed = timeSplit[0].split(".").reverse().join("-");
-		const dateString = `${dateReversed}T${timeSplit[1]}`;
-		const unixTimestamp = Math.floor(Date.parse(dateString) / 1000);
-		const hourTimestamp = Math.floor(unixTimestamp / 3600) % 24;
+		const timestamp = parseTimestampEntry(record[8]);
 
 		if (route in data) {
-			if (hourTimestamp in data[route]) {
-				data[route][hourTimestamp]++;
+			if (timestamp.hour in data[route]) {
+				data[route][timestamp.hour]++;
 			} else {
-				data[route][hourTimestamp] = 1;
+				data[route][timestamp.hour] = 1;
 			}
 		} else {
 			data[route] = {};
-			data[route][hourTimestamp] = 1;
+			data[route][timestamp.hour] = 1;
 		}
 
 		process.stdout.clearLine(0);
